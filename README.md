@@ -1,1 +1,1 @@
-# Rifky
+# simple-app
