@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = 'rifky014/simple-app'
+    IMAGE_NAME = 'rakaganteng/simple-app'
     REGISTRY_CREDENTIALS = 'dockerhub-credentials'
   }
 
