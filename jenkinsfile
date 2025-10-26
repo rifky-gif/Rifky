@@ -1,31 +1,70 @@
 pipeline {
   agent any
   environment {
-    IMAGE_NAME = 'rifky014/simple-app'
+    IMAGE_NAME = 'rifky014/simple-app'        
     REGISTRY_CREDENTIALS = 'dockerhub-credentials'
   }
+
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
-    stage('Build') {
-      steps { bat 'echo "Build di Windows dimulai..."' }
+
+    stage('Unit Test') {
+      steps {
+        bat '''
+        echo Menjalankan Unit Test dengan pytest...
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pytest --maxfail=1 --disable-warnings -q
+        '''
+      }
     }
+
     stage('Build Docker Image') {
-      steps { bat "docker build -t %IMAGE_NAME%:%BUILD_NUMBER% ." }
+      // hanya dijalankan jika test lulus
+      when {
+        expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+      }
+      steps {
+        bat '''
+        echo Membuat Docker image...
+        docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .
+        '''
+      }
     }
+
     stage('Push Docker Image') {
+      // hanya dijalankan jika test & build sukses
+      when {
+        expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+      }
       steps {
         withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-          bat 'docker login -u %USER% -p %PASS%'
-          bat "docker push %IMAGE_NAME%:%BUILD_NUMBER%"
-          bat "docker tag %IMAGE_NAME%:%BUILD_NUMBER% %IMAGE_NAME%:latest"
-          bat "docker push %IMAGE_NAME%:latest"
+          bat '''
+          echo Login ke Docker Hub...
+          docker login -u %USER% -p %PASS%
+          echo Push image ke Docker Hub...
+          docker push %IMAGE_NAME%:%BUILD_NUMBER%
+          docker tag %IMAGE_NAME%:%BUILD_NUMBER% %IMAGE_NAME%:latest
+          docker push %IMAGE_NAME%:latest
+          '''
         }
       }
     }
   }
+
   post {
-    always { bat 'echo "Build selesai."' }
+    success {
+      bat 'echo "Pipeline berhasil dijalankan dan image sudah di-push ke Docker Hub!"'
+    }
+    failure {
+      bat 'echo "Unit test gagal atau build gagal. Proses dihentikan."'
+    }
+    always {
+      bat 'echo "Build selesai."'
+    }
   }
 }
